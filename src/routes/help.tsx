@@ -6,8 +6,8 @@ import { ArrowLeft, Download } from "lucide-react";
 export const Route = createFileRoute("/help")({
   head: () => ({
     meta: [
-      { title: "Help — Menu Price Comparator" },
-      { name: "description", content: "Format guide and variation pricing rules." },
+      { title: "Help - Menu Price Comparator" },
+      { name: "description", content: "Format guide and source price matching rules." },
     ],
   }),
   component: Help,
@@ -26,9 +26,9 @@ function Help() {
       <Card className="p-6 space-y-3">
         <h2 className="text-xl font-semibold">Supported source formats (web)</h2>
         <ul className="list-disc pl-6 text-sm space-y-1">
-          <li><b>.txt</b> — one item per line, e.g. <code>PANEER TIKKA 220</code> or <code>PANEER TIKKA ₹220</code></li>
-          <li><b>.csv</b> — must contain item-name and price columns (auto-detected)</li>
-          <li><b>.xlsx / .xls</b> — any sheet; tabular or text patterns both work</li>
+          <li><b>.txt</b> - one item per line, e.g. <code>PANEER TIKKA 220</code> or <code>PANEER TIKKA Rs 220</code></li>
+          <li><b>.csv</b> - must contain item-name and price columns (auto-detected)</li>
+          <li><b>.xlsx / .xls</b> - any sheet; tabular or text patterns both work</li>
         </ul>
         <p className="text-sm text-muted-foreground">
           For images, PDFs, and Word docs, use the downloadable Python script.
@@ -39,25 +39,17 @@ function Help() {
         <h2 className="text-xl font-semibold">Target CSV (Swiggy/Zomato)</h2>
         <p className="text-sm">
           Comma or semicolon delimited. Parent rows have <code>Price = 0</code> and are kept untouched.
-          Variation rows (Half/Full/Small/Large/etc.) get their prices recomputed from the matched
-          source item using the rules in the sidebar.
+          Variation rows are updated only when that exact variation price exists in the source menu.
         </p>
       </Card>
 
       <Card className="p-6 space-y-3">
         <h2 className="text-xl font-semibold">Variation pricing</h2>
-        <table className="w-full text-sm">
-          <thead><tr className="text-left border-b"><th className="py-1">Variation</th><th>Price</th></tr></thead>
-          <tbody className="divide-y">
-            <tr><td className="py-1">Full / Regular / 12 pcs</td><td>= base</td></tr>
-            <tr><td className="py-1">Half</td><td>~55% of base</td></tr>
-            <tr><td className="py-1">Small</td><td>~65% of base</td></tr>
-            <tr><td className="py-1">Large</td><td>~115% of base</td></tr>
-            <tr><td className="py-1">6 pcs</td><td>~60% of base</td></tr>
-            <tr><td className="py-1">With ice cream</td><td>base + ₹25</td></tr>
-          </tbody>
-        </table>
-        <p className="text-xs text-muted-foreground">All percentages are configurable in the sidebar.</p>
+        <p className="text-sm">
+          The app does not calculate variation prices from percentage rules. For example, a Half row is
+          updated only if the source menu contains a Half price for the same item. If the source menu only
+          has a Full/base price, Half, Small, Large, 6 pcs, 12 pcs, and other variation rows stay unchanged.
+        </p>
       </Card>
 
       <Card className="p-6 space-y-3">

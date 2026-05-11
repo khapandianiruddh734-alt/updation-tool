@@ -1,6 +1,5 @@
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -29,28 +28,15 @@ export function AppSidebar() {
 
       <Separator />
 
-      <div className="space-y-3">
-        <div>
-          <Label className="text-xs">Match threshold: {s.threshold}</Label>
-          <Slider
-            min={50}
-            max={95}
-            step={5}
-            value={[s.threshold]}
-            onValueChange={(v) => s.set({ threshold: v[0] })}
-          />
-        </div>
-
-        <details className="text-sm">
-          <summary className="cursor-pointer font-medium">Variation rules (%)</summary>
-          <div className="mt-2 space-y-2">
-            <RuleRow label="Half" v={s.rules.half} on={(n) => s.set({ rules: { ...s.rules, half: n } })} />
-            <RuleRow label="Small" v={s.rules.small} on={(n) => s.set({ rules: { ...s.rules, small: n } })} />
-            <RuleRow label="Large" v={s.rules.large} on={(n) => s.set({ rules: { ...s.rules, large: n } })} />
-            <RuleRow label="6 pcs" v={s.rules.sixPcs} on={(n) => s.set({ rules: { ...s.rules, sixPcs: n } })} />
-            <RuleRow label="+ Ice cream ₹" v={s.rules.withIceCream} on={(n) => s.set({ rules: { ...s.rules, withIceCream: n } })} />
-          </div>
-        </details>
+      <div>
+        <Label className="text-xs">Match threshold: {s.threshold}</Label>
+        <Slider
+          min={50}
+          max={95}
+          step={5}
+          value={[s.threshold]}
+          onValueChange={(v) => s.set({ threshold: v[0] })}
+        />
       </div>
 
       <Separator />
@@ -79,19 +65,6 @@ export function AppSidebar() {
   );
 }
 
-function RuleRow({ label, v, on }: { label: string; v: number; on: (n: number) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <Label className="text-xs">{label}</Label>
-      <Input
-        type="number"
-        value={v}
-        onChange={(e) => on(Number(e.target.value) || 0)}
-        className="h-7 w-20 text-right"
-      />
-    </div>
-  );
-}
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex justify-between">

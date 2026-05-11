@@ -18,76 +18,59 @@ import {
 } from "@/components/ui/collapsible";
 import { useSession } from "@/store/session";
 import { buildMatcher } from "@/lib/match";
-import { computeVariationPrice, isParentRow, extractPortionFromName } from "@/lib/variations";
+import { isParentRow } from "@/lib/variations";
 import { detectVariation, normalize } from "@/lib/normalize";
 import { VariationMapper } from "@/lib/variation-mapper";
 import type { CompareRow, ChangeLogEntry } from "@/lib/types";
 
-// Helper to intelligently select the best price for a variation
-function selectBestSourcePrice(
-  sourceItems: typeof s.sourceItems,
+function canonicalVariation(text: string): string {
+  const value = ` ${text.toLowerCase().replace(/[^a-z0-9\s]/g, " ")} `.replace(/\s+/g, " ");
+  if (value.includes(" with ice cream ")) return "with ice cream";
+  if (/\b12\s*pcs?\b/.test(value) || /\b12\s*pieces?\b/.test(value)) return "12 pcs";
+  if (/\b10\s*pcs?\b/.test(value) || /\b10\s*pieces?\b/.test(value)) return "10 pcs";
+  if (/\b8\s*pcs?\b/.test(value) || /\b8\s*pieces?\b/.test(value)) return "8 pcs";
+  if (/\b6\s*pcs?\b/.test(value) || /\b6\s*pieces?\b/.test(value)) return "6 pcs";
+  if (/\b4\s*pcs?\b/.test(value) || /\b4\s*pieces?\b/.test(value)) return "4 pcs";
+  if (/\bhalf\b|\b1\s*2\b|\b50\b/.test(value)) return "half";
+  if (/\bfull\b|\bwhole\b|\b100\b/.test(value)) return "full";
+  if (/\bregular\b/.test(value)) return "regular";
+  if (/\bsmall\b|\bmini\b/.test(value)) return "small";
+  if (/\blarge\b|\bjumbo\b|\bfamily\b|\bparty\b/.test(value)) return "large";
+  return "";
+}
+
+function targetVariationKey(itemName: string, variation: string): string {
+  return canonicalVariation(variation) || canonicalVariation(itemName);
+}
+
+function sourceVariationKey(sourceName: string): string {
+  return canonicalVariation(sourceName);
+}
+
+function variationPriceFromSource(
+  sourceItems: ReturnType<typeof useSession>["sourceItems"],
   itemName: string,
   targetVariation: string,
-  normalizedItemName: string
 ): { price: number; sourceName: string } | null {
-  // Find all source items that normalize to the same item name
+  const normalizedItemName = normalize(itemName);
   const candidates = sourceItems.filter(
     (item) => normalize(item.name).toLowerCase() === normalizedItemName.toLowerCase()
   );
 
   if (!candidates.length) return null;
-  if (candidates.length === 1) {
-    return { price: candidates[0].price, sourceName: candidates[0].name };
+
+  const targetKey = targetVariationKey(itemName, targetVariation);
+  if (targetKey) {
+    const exactVariation = candidates.find((candidate) => sourceVariationKey(candidate.name) === targetKey);
+    if (!exactVariation) return null;
+    return { price: exactVariation.price, sourceName: exactVariation.name };
   }
 
-  // Multiple candidates - use portion-based selection
-  const targetPortion = extractPortionFromName(targetVariation);
-  if (!targetPortion) {
-    // No target portion info, use highest price (typically Full/regular)
-    const highest = candidates.reduce((a, b) => (a.price >= b.price ? a : b));
-    return { price: highest.price, sourceName: highest.name };
-  }
+  const exactBase = candidates.find((candidate) => !sourceVariationKey(candidate.name));
+  if (exactBase) return { price: exactBase.price, sourceName: exactBase.name };
+  if (candidates.length === 1) return { price: candidates[0].price, sourceName: candidates[0].name };
 
-  // Try to find a source with matching portion
-  const targetOrder = getPortionOrder(targetPortion);
-  for (const candidate of candidates) {
-    const candidatePortion = extractPortionFromName(candidate.name);
-    if (candidatePortion) {
-      const candidateOrder = getPortionOrder(candidatePortion);
-      if (candidateOrder === targetOrder) {
-        return { price: candidate.price, sourceName: candidate.name };
-      }
-    }
-  }
-
-  // No exact portion match - use price-based mapping
-  const sorted = [...candidates].sort((a, b) => a.price - b.price);
-  if (targetOrder <= 2) {
-    // Small portion - use lowest price
-    return { price: sorted[0].price, sourceName: sorted[0].name };
-  } else if (targetOrder >= 4) {
-    // Large portion - use highest price
-    return { price: sorted[sorted.length - 1].price, sourceName: sorted[sorted.length - 1].name };
-  } else {
-    // Regular portion - use middle price or highest
-    return { price: sorted[sorted.length - 1].price, sourceName: sorted[sorted.length - 1].name };
-  }
-}
-
-function getPortionOrder(portion: string): number {
-  const order: Record<string, number> = {
-    "6pcs": 1,
-    "6 pcs": 1,
-    "half": 2,
-    "small": 2,
-    "regular": 3,
-    "full": 4,
-    "large": 4,
-    "12pcs": 5,
-    "12 pcs": 5,
-    "with ice cream": 6,
-  };
-  return order[portion.toLowerCase()] ?? 99;
+  return null;
 }
 
 export function CompareStep({ onNext }: { onNext: () => void }) {
@@ -185,18 +168,40 @@ export function CompareStep({ onNext }: { onNext: () => void }) {
         };
       }
 
-      // Intelligently select the best source price based on variation
-      const normalizedItemName = normalize(itemName);
-      const bestSource = selectBestSourcePrice(
-        s.sourceItems,
-        itemName,
-        variation,
-        normalizedItemName
-      );
-      
-      const basePrice = bestSource?.price ?? m.item.price;
-      const sourceNameUsed = bestSource?.sourceName ?? m.item.name;
-      const newPrice = computeVariationPrice(basePrice, variation, s.rules);
+      const matchedSource = variationPriceFromSource(s.sourceItems, itemName, variation);
+      if (!matchedSource) {
+        if (s.changeLogEnabled) {
+          changeLogEntries.push({
+            id: "",
+            timestamp: "",
+            itemId,
+            itemName,
+            variation,
+            oldPrice,
+            newPrice: oldPrice,
+            changeType: "no_change",
+            matchSource: "N/A",
+            matchScore: m.score,
+            variationMapping: "No source price for this variation",
+            userAction: "auto",
+          });
+        }
+
+        return {
+          rowIndex: i + 2,
+          itemName,
+          variation,
+          oldPrice,
+          newPrice: oldPrice,
+          status: "unchanged",
+          remarks: `No source price found for ${variation || "base item"} - kept unchanged`,
+          matchedSource: m.item.name,
+          matchScore: m.score,
+        };
+      }
+
+      const sourceNameUsed = matchedSource.sourceName;
+      const newPrice = matchedSource.price;
       const variationDisplay = varMapper.getVariationDisplayName(variation);
       const sourceVariationDisplay = varMapper.getVariationDisplayName("");
 
