@@ -10,6 +10,18 @@ const PRICE_PATTERNS = [
   /^\d+[).\]]?\s*([A-Z][A-Z\s&'\-()]+?)\s+₹?\s*(\d{2,5})\s*$/,
 ];
 
+const CATEGORY_PRICE_PATTERN =
+  /^([A-Z][A-Z\s&'\-()]+?)\s*(?:@|at)\s*(?:rs\.?|inr|â‚¹)?\s*(\d{1,5})\s*$/i;
+
+const SKIP_CATEGORY_LINES = new Set([
+  "add on",
+  "add ons",
+  "addon",
+  "addons",
+  "extra",
+  "extras",
+]);
+
 export function extractFromText(text: string): SourceItem[] {
   const lines = text.split(/\r?\n/);
   const items: SourceItem[] = [];
@@ -29,6 +41,7 @@ export function extractFromText(text: string): SourceItem[] {
       }
     }
   }
+  items.push(...extractCategoryItems(lines));
   // dedupe
   const seen = new Set<string>();
   return items.filter((it) => {
@@ -37,6 +50,84 @@ export function extractFromText(text: string): SourceItem[] {
     seen.add(k);
     return true;
   });
+}
+
+function extractCategoryItems(lines: string[]): SourceItem[] {
+  const items: SourceItem[] = [];
+  let blockName = "";
+  let blockPrice = 0;
+  let groupName = "";
+
+  for (const raw of lines) {
+    const line = cleanMenuLine(raw);
+    if (!line) continue;
+
+    const pricedCategory = line.match(CATEGORY_PRICE_PATTERN);
+    if (pricedCategory) {
+      blockName = toTitleCase(pricedCategory[1]);
+      blockPrice = Number(pricedCategory[2]);
+      groupName = "";
+      continue;
+    }
+
+    if (!blockPrice || isNoiseLine(line)) continue;
+
+    if (looksLikeGroupHeading(line, blockName, groupName)) {
+      groupName = toTitleCase(line);
+      items.push({ name: groupName, price: blockPrice });
+      continue;
+    }
+
+    if (groupName) {
+      items.push({
+        name: `${toTitleCase(line)} ${groupName}`,
+        price: blockPrice,
+      });
+    }
+  }
+
+  return items;
+}
+
+function cleanMenuLine(value: string): string {
+  return value
+    .replace(/[|,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNoiseLine(line: string): boolean {
+  const normalized = line
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized || SKIP_CATEGORY_LINES.has(normalized)) return true;
+  if (/^\d+$/.test(normalized)) return true;
+  if (normalized.length < 3) return true;
+  return false;
+}
+
+function looksLikeGroupHeading(line: string, blockName: string, currentGroup: string): boolean {
+  const normalizedLine = line.toLowerCase();
+  const blockTokens = blockName
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((token) => token.length > 2);
+
+  if (blockTokens.some((token) => normalizedLine.includes(token))) return true;
+  if (!currentGroup && line.split(/\s+/).length > 1) return true;
+  return false;
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 export async function extractFromFile(file: File): Promise<SourceItem[]> {
