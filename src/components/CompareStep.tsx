@@ -20,7 +20,6 @@ import { useSession } from "@/store/session";
 import { buildMatcher } from "@/lib/match";
 import { isParentRow } from "@/lib/variations";
 import { detectVariation, normalize } from "@/lib/normalize";
-import { VariationMapper } from "@/lib/variation-mapper";
 import type { CompareRow, ChangeLogEntry } from "@/lib/types";
 
 function canonicalVariation(text: string): string {
@@ -45,6 +44,12 @@ function targetVariationKey(itemName: string, variation: string): string {
 
 function sourceVariationKey(sourceName: string): string {
   return canonicalVariation(sourceName);
+}
+
+function displayVariation(value: string): string {
+  const key = canonicalVariation(value);
+  if (!key) return value || "base item";
+  return key.toUpperCase();
 }
 
 function variationPriceFromSource(
@@ -81,7 +86,6 @@ export function CompareStep({ onNext }: { onNext: () => void }) {
   // Run compare on mount / dep change
   useEffect(() => {
     const matcher = buildMatcher(s.sourceItems);
-    const varMapper = new VariationMapper(s.rules);
     const changeLogEntries: ChangeLogEntry[] = [];
 
     // Count rows per item name to detect whether a "parent-looking" row
@@ -202,8 +206,8 @@ export function CompareStep({ onNext }: { onNext: () => void }) {
 
       const sourceNameUsed = matchedSource.sourceName;
       const newPrice = matchedSource.price;
-      const variationDisplay = varMapper.getVariationDisplayName(variation);
-      const sourceVariationDisplay = varMapper.getVariationDisplayName("");
+      const variationDisplay = displayVariation(variation);
+      const sourceVariationDisplay = sourceNameUsed;
 
       // Determine change type
       let changeType: ChangeLogEntry["changeType"] = "no_change";
