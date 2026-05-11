@@ -8,7 +8,21 @@ type BuildArgs = {
   compare: CompareRow[];
   changeLog?: ChangeLogEntry[];
   priceCol: string;
+  delimiter?: string;
 };
+
+function goodsServicesIndex(headers: string[]): number {
+  return headers.findIndex((h) => /goods\s*\/?\s*services/i.test(h));
+}
+
+function insertRemarksColumn(headers: string[]): { outHeaders: string[]; insertAt: number } {
+  const remarksCol = "Update Remarks";
+  const gIdx = goodsServicesIndex(headers);
+  const outHeaders = [...headers];
+  const insertAt = gIdx >= 0 ? gIdx + 1 : outHeaders.length;
+  outHeaders.splice(insertAt, 0, remarksCol);
+  return { outHeaders, insertAt };
+}
 
 export function buildStyledXlsx({
   headers,
@@ -19,11 +33,7 @@ export function buildStyledXlsx({
 }: BuildArgs): Promise<Blob> {
   return (async () => {
     // Insert "Update Remarks" right after "Goods/Services" if present, else at end
-    const gIdx = headers.findIndex((h) => /goods\s*\/?\s*services/i.test(h));
-    const remarksCol = "Update Remarks";
-    const outHeaders = [...headers];
-    const insertAt = gIdx >= 0 ? gIdx + 1 : outHeaders.length;
-    outHeaders.splice(insertAt, 0, remarksCol);
+    const { outHeaders, insertAt } = insertRemarksColumn(headers);
 
     // Create workbook using exceljs
     const wb = new ExcelJS.Workbook();
@@ -167,6 +177,39 @@ export function buildStyledXlsx({
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
   })();
+}
+
+export function buildUpdatedCsv({
+  headers,
+  rows,
+  compare,
+  priceCol,
+  delimiter = ",",
+}: BuildArgs): Blob {
+  const { outHeaders, insertAt } = insertRemarksColumn(headers);
+  const lines = [outHeaders.map((cell) => escapeCsvCell(cell, delimiter)).join(delimiter)];
+
+  rows.forEach((r, i) => {
+    const cmp = compare[i];
+    const cells = headers.map((h) => {
+      if (h === priceCol && cmp && (cmp.status === "updated" || cmp.status === "multi-match")) {
+        return String(cmp.newPrice);
+      }
+      return r[h] ?? "";
+    });
+
+    cells.splice(insertAt, 0, cmp?.remarks ?? "");
+    lines.push(cells.map((cell) => escapeCsvCell(cell, delimiter)).join(delimiter));
+  });
+
+  return new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+}
+
+function escapeCsvCell(value: string | number, delimiter: string): string {
+  const s = String(value ?? "");
+  return s.includes(delimiter) || /["\r\n]/.test(s)
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
 }
 
 export function buildComparisonCsv(rows: CompareRow[]): Blob {

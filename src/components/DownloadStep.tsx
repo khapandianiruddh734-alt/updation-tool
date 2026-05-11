@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, FileText, Code2 } from "lucide-react";
 import { useSession } from "@/store/session";
-import { buildComparisonCsv, buildStyledXlsx } from "@/lib/excel";
+import { buildComparisonCsv, buildStyledXlsx, buildUpdatedCsv } from "@/lib/excel";
 
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -39,11 +39,29 @@ export function DownloadStep() {
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <ActionCard
-          icon={<FileSpreadsheet className="h-8 w-8 text-emerald-600" />}
+          icon={<FileText className="h-8 w-8 text-emerald-600" />}
+          title="Updated Target CSV"
+          desc="Same CSV format and column order. Only price values are changed; remarks are inserted after Goods/Services."
+          cta="Download CSV"
+          onClick={() =>
+            download(
+              buildUpdatedCsv({
+                headers: s.csvHeaders,
+                rows: s.csvRows,
+                compare: s.compare,
+                priceCol: s.priceCol,
+                delimiter: s.csvDelimiter,
+              }),
+              `${baseName}_updated.csv`,
+            )
+          }
+        />
+        <ActionCard
+          icon={<FileSpreadsheet className="h-8 w-8 text-teal-600" />}
           title="Updated Excel (.xlsx)"
-          desc="Original structure preserved with 'Update Remarks' column. Includes Change Log sheet with color-coded highlights."
+          desc="Excel copy with highlighted price changes and a Change Log sheet."
           cta="Download .xlsx"
           onClick={() =>
             downloadAsync(
