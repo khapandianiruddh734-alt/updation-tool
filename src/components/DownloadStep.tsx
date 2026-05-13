@@ -41,24 +41,6 @@ export function DownloadStep() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <ActionCard
-          icon={<FileText className="h-8 w-8 text-emerald-600" />}
-          title="Updated Target CSV"
-          desc="Same CSV format and column order. Only price values are changed; remarks are inserted after Goods/Services."
-          cta="Download CSV"
-          onClick={() =>
-            download(
-              buildUpdatedCsv({
-                headers: s.csvHeaders,
-                rows: s.csvRows,
-                compare: s.compare,
-                priceCol: s.priceCol,
-                delimiter: s.csvDelimiter,
-              }),
-              `${baseName}_updated.csv`,
-            )
-          }
-        />
-        <ActionCard
           icon={<FileSpreadsheet className="h-8 w-8 text-teal-600" />}
           title="Updated Excel (.xlsx)"
           desc="Excel copy with highlighted price changes and a Change Log sheet."
